@@ -47,9 +47,8 @@ class AiManagement {
                         }
                     };
                     this.logger.info(`${username} Data for stt API: ${data}`, { timestamp }); // Log the data before making the chat API request
-
                     // Make a POST request to the API endpoint
-                    const sttResponse = await axios.post(this.API_URL + '/api/stt', data);
+                    const sttResponse = await axios.post(this.API_URL + '/assistant/stt', data);
                     if (sttResponse.status === 200) {
                         this.logger.info(`${username} STT request successful: ${sttResponse.data}`, { timestamp }); // Log the successful chat API request
                         return res.status(200).json(sttResponse.data);
@@ -73,6 +72,60 @@ class AiManagement {
             res.status(error.response.status).end();
         }
 
+    }
+
+    async chat(req, res) {
+        const timestamp = moment().format('DD-MM-YYYY HH:mm:ss'); // Retrieve the current timestamp for logging
+        try {
+            const userId = req.session.user_id
+            const username = req.session.username; // Assuming you have session management middleware
+            const question = xss(req.body.question);
+            const qid = xss(req.body.qid);
+            const answer = xss(req.body.answer);
+            this.logger.info(`${username} Performing LLM:`, { timestamp }); // Log the entry into the chat mode
+
+            if (username in userContents.sessionTimestamps) {
+                const sessionTimestamp = userContents.sessionTimestamps[username];
+                let data = {};
+
+                if (answer.length > 0) {
+                    data = {
+                        sessionId: req.session.sessionId,
+                        data: {
+                            userId: userId,
+                            question: question,
+                            qid: qid,
+                            answer: answer
+                        }
+                    };
+                    this.logger.info(`${username} Data for LLM API: ${data}`, { timestamp }); // Log the data before making the llm API request
+
+                    // Make a POST request to the API endpoint
+                    const llmResponse = await axios.post(this.API_URL + '/assistant/feedback', data);
+                    console.log("llm resposnse",llmResponse)
+
+                    if (llmResponse.status === 200) {
+                        this.logger.info(`${username} llm request successful: ${llmResponse.data}`, { timestamp }); // Log the successful llm API request
+                        return res.status(200).json(llmResponse.data);
+                    } else {
+                        this.logger.error(`${username} Failed to get the feedback.`, { timestamp }); // Log the failure to get the feedback
+                        return res.status(llmResponse.status).json({ message: 'Failed to get the feedback' });
+                    }
+                } else {
+                    // Handle the case where there are no answer
+                    this.logger.error(`${username} No answer found.`, { timestamp }); // Log the case where no answer are found
+                    return res.status(404).json({ message: 'No answer found' });
+                }
+            } else {
+                // Handle the case where the username is not in sessionTimestamps
+                this.logger.error('Unauthorized access:', { timestamp }); // Log the unauthorized access attempt
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+        } catch (error) {
+            console.error('Error:', error.message);
+            this.logger.error(`Error during stt: ${error.message}`, { timestamp }); // Log any error that occurs during the llm
+            res.status(error.response.status).end();
+        }
     }
 
 
@@ -111,3 +164,4 @@ class AiManagement {
         }
     }
 }
+module.exports = AiManagement;

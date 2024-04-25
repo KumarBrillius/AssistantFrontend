@@ -10,6 +10,8 @@ const axios = require('axios');
 const API_URL = configData.API_URL;
 const key = "kojsnhfitonhsuth";
 const iv = "odbshirnkofgfffs";
+const UserContentsModule = require('./User_contents');
+const aiManagementModule = require('./AI_Management');
 const logpath = require('path');
 const currentDir = __dirname;
 const parentDir = path.join(currentDir, '..', '..', '..', '..');
@@ -18,8 +20,6 @@ const { createLogger, transports, format } = require('winston');
 const { combine, timestamp, printf } = format;
 const DailyRotateFile = require('winston-daily-rotate-file');
 
-const UserContentsModule = require('./User_contents');
-const aiManagementModule = require('./AI_Management');
 
 if (!fs.existsSync(logdir)) {
     fs.mkdirSync(logdir);
@@ -121,10 +121,19 @@ router.get('/assistant', (req, res) => {
     res.sendFile(path.join(__dirname, '..', '..', '..', 'build', 'index.html'));
 });
 
+router.post('/getquestionsfromapi', async (req, res) => {
+    const userContents = new UserContentsModule(key, iv, API_URL, logger);
+    await userContents.getquestionsfromapi(req, res);
+});
 
 router.post('/createUserDirectory', tokenRequired, async (req, res) => {
     const userContents = new UserContentsModule(key, iv, API_URL, logger);
     await userContents.create_directory(req, res);
+});
+
+router.post('/getUserInfo', tokenRequired, async (req, res) => {
+    const userContents = new UserContentsModule(key, iv, API_URL, logger);
+    await userContents.getUserInfo(req, res);
 });
 
 router.post('/timestamps', tokenRequired, (req, res) => {
@@ -140,6 +149,11 @@ router.post('/upload-audio', tokenRequired, async (req, res) => {
 router.post('/stt', async (req, res) => {
     const aiManagement = new aiManagementModule(key, iv, API_URL, logger);
     await aiManagement.stt(req, res);
+});
+
+router.post('/chat', async (req, res) => {
+    const aiManagement = new aiManagementModule (key, iv, API_URL,logger);
+    await aiManagement.chat(req, res);  
 });
 router.post('/chatreset', async (req, res) => {
     const aiManagement = new aiManagementModule(key, iv, API_URL, logger);

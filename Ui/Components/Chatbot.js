@@ -30,6 +30,7 @@ export default function Chatbot() {
     const [showAudio, setShowAudio] = useState(false);
     const [notfound, setNotfound] = useState([])
     const [inputValue, setInputValue] = useState('');
+    const [feedback, setFeedback] = useState('');
     const refer = React.createRef();
 
     //const [remainingTime, setRemainingTime] = useState(configData.SessionDuration);
@@ -43,11 +44,11 @@ export default function Chatbot() {
     const [sttHistory, setSTTHistory] = useState([]); // Store STT history
 
     // State variables for loading and UI elements
-    const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [toggleState, setToggleState] = useState("Expand");
     const [sttLoading, setSttLoading] = useState(false);
     const [botLoading, setBotLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [showChatBot, setShowChatBot] = useState(false);
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [attemptNumber, setAttemptNumber] = useState(0);
@@ -55,6 +56,8 @@ export default function Chatbot() {
     const [tabSwitchingCount, setTabSwitchingCount] = useState(0);
     const [tabSwitchingConfig, setTabSwitchingConfig] = useState(false); // Used for tab switching config depending on mode
     const [answer, setAnswer] = useState([])
+    const [userInfo, setUserInfo] = useState('')
+    const[aiAnswer,setAiAnswer] = useState('')
     const buttonClass = "border border-transparent text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500";
 
 
@@ -66,6 +69,8 @@ export default function Chatbot() {
     });
     useEffect(() => {
         toggleChatBot();
+        getUserInfo()
+        fetchQuestionsFromAPI()
     }, []);
 
     const [endFlag, setEndFlag] = useState(1);
@@ -76,9 +81,8 @@ export default function Chatbot() {
     const fetchQuestionsFromAPI = async () => {
         try {
             setQuestions([])
-            setBotLoading(true);
-            const response = await fetch("/skillPractice/getquestionsfromapi", {
-                method: "POST",
+            const response = await fetch("/assistantRoutes/getquestionsfromapi", {
+                method: "POST",   
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -88,17 +92,14 @@ export default function Chatbot() {
                 const { questions: fetchedQuestions, questionIds: fetchedQuestionIds } = await response.json();
 
                 // Set the fetched questions into the state
-                setAnswer(fetchedQuestions);
-                console.log("fetched question is ", questions);
+                setBotLoading(true)
+                setTimeout(() => {
+                    setAnswer(fetchedQuestions);
 
-                setQuestionId(questionIds);
-                console.log("fetched questionid is ", questionIds);
+                    setQuestionId(fetchedQuestionIds);
+                    setBotLoading(false)
+                }, 5000);
 
-
-                // Set the fetched questions into the state
-                //setAnswer(Answer);
-
-                //setBotLoading(false);
 
             } else {
                 console.error("Failed to fetch questions.");
@@ -109,85 +110,33 @@ export default function Chatbot() {
             //handleFlashMessage("Error: " + error, false);
         }
     };
-    const getAnswersFromAPI = async (index) => {
-        setQuestions([])
-        setBotLoading(true);
 
-        {
-            const response = await fetch("/get_answers", {
+    const getUserInfo = async () => {
+        try {
+
+            const response = await fetch("/assistantRoutes/getUserInfo", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    questionIndex: index,
-                }),
             });
 
-            if (response.ok) {
-                const Answer = await response.json();
-                console.log(Answer)
+            if (response.status === 200) {
+                const { data: data } = await response.json();
 
                 // Set the fetched questions into the state
-                setAnswer(Answer);
+                setUserInfo(`hello ${data}`);
 
-                setBotLoading(false);
-            }
-        }
-    };
+                setQuestionId(questionIds);
 
-
-
-    const fetchRelevantDoc = async (question) => {
-        // Display loading view for the bot
-        console.log("question ", question)
-        setQuestions([])
-        setNotfound([])
-        setAnswer('')
-        //setBotLoading(true);
-        if (question === "") {
-            setBotLoading(false);
-            setNotfound(["please enter the question..."]);
-            return;
-        }
-
-        try {
-            const response = await fetch("/relevant_doc", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    selectedQuestion: question,
-                }),
-            });
-
-            if (response.ok) {
-                // Introduce a delay of 2 seconds
-                // const predefinedQuestions = await response.json();
-                // setQuestions(predefinedQuestions);
-                setTimeout(async () => {
-                    const data = await response.json();
-
-                    if (typeof data === 'number') {
-                        getAnswersFromAPI(data)
-                    } else {
-                        (data.length > 0) ? setQuestions(data)
-                            : setNotfound(["question not found ...!", 'please try again another question.'])
-                    }
-                    // Hide the loading view for the bot after receiving the response
-                    setBotLoading(false);
-                }, 2000);
+            } else {
+                console.error("Failed to fetch questions.");
+                //handleFlashMessage("Failed to fetch questions. Please login again.", false);
             }
         } catch (error) {
-            // Handle error
-            console.error("Error fetching relevant documents:", error);
-            // Optionally, set an error state or display an error message
-            // Hide the loading view for the bot in case of an error
-            setBotLoading(false);
+            console.error("An error occurred while fetching questions:", error);
+            //handleFlashMessage("Error: " + error, false);
         }
     };
 
+   
 
 
     const toggleChatBot = async () => {
@@ -197,6 +146,7 @@ export default function Chatbot() {
 
         try {
             // First, call the createUserDirectories route with the selected option
+            console.log("togglechat function")
             const createUserResponse = await fetch("/assistantRoutes/createUserDirectory", {
                 method: "POST",
                 headers: {
@@ -212,7 +162,7 @@ export default function Chatbot() {
             const timestampResponse = await fetch("/assistantRoutes/timestamps", {
                 method: "POST",
             });
-
+            console.log("timestamp response", timestampResponse)
             if (!timestampResponse.ok) {
                 throw new Error("Network response was not ok");
             }
@@ -225,12 +175,80 @@ export default function Chatbot() {
         }
     };
 
+    const handleTry = async (value) => {
+        if (!answer[quesNumber - 1]) {
+            // Handle the case where there is no question to send
+            console.error("No question available for feedback.");
+            return;
+        }
+
+        if (attemptNumber <= feedbacksNumber) {
+            console.error("Feedback requested for the same recording.");
+            //handleFlashMessage("Feedback requested for the same recording.", false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const questionToSubmit = answer[quesNumber - 1];
+            const questionId = questionIds[quesNumber - 1]
+
+            const response = await fetch("/assistantRoutes/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ question: questionToSubmit, answer: value, qid: questionId }),
+            });
+
+            if (response.status === 200) {
+                // Handle success, e.g., show a confirmation message
+
+                // Set the feedbackText based on the data received from the route
+                const parsed = await response.json();
+
+                console.log("parsed data is", parsed);
+                setFeedback(parsed[0])
+
+                // if (parsed) {
+                //     // Update the feedback at the specific index based on attemptNumber
+                //     setFeedbackHistory((prevFeedback) => {
+                //         const updatedFeedback = [...prevFeedback];
+                //         updatedFeedback[attemptNumber - 1] = parsed;
+
+                //         return updatedFeedback;
+                //     });
+
+                setShowFeedback(true);
+                setToggleState("Expand");
+                setFeedbacksNumber(feedbacksNumber + 1);
+            } else {
+                console.error("Received invalid feedback");
+                // handleFlashMessage("Received invalid feedback", false);
+            }
+        }
+
+        catch (error) {
+            console.error("Error sending feedback:", error);
+            // handleFlashMessage("Error: " + error, false);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
     const handleSendClick = (e) => {
         e.preventDefault()
         if (inputValue.trim() !== '') {
             setSelectedQuestion(inputValue);
-            fetchRelevantDoc(inputValue);
+            setAttemptNumber(attemptNumber + 1);
+            handleTry(inputValue);
+            setUserInfo('');
+            aiAnswers='';
+            console.log("ai answers",aiAnswers)
             setAiQues(aiQues, ...divlist);
+            console.log("ai ques is",aiQues);
             setInputValue('')
         }
     };
@@ -345,14 +363,9 @@ export default function Chatbot() {
     };
 
     const startRecording = async () => {
-        //Check if the maximum number of attempts is reached
-        // if (attemptNumber > configData.MaxAttempts) {
-        //     // handleFlashMessage("Max number of attempts reached", false);
-        //     return;
-        // }
-
         if (!permission) {
             if ("MediaRecorder" in window) {
+                console.log("4256488887")
                 try {
                     var streamData = await navigator.mediaDevices.getUserMedia({
                         audio: {
@@ -363,18 +376,16 @@ export default function Chatbot() {
                     });
                     setPermission(true);
                     setStream(streamData);
-                    console.log("stream data is", streamData)
+                    console.log("stream data is ", streamData)
                 } catch (err) {
                     console.log(err.message);
                 }
             } else {
-                console.log("The MediaRecorder API is not supported in your browser.");
             }
         }
 
         setRecordingStatus("recording");
-        // setToggleState("Collapse");
-        // setShowAudio(false);
+        console.log("mimetype", mimeType, streamData)
         const media = new MediaRecorder(streamData, { type: mimeType });
         mediaRecorder.current = media;
         mediaRecorder.current.start();
@@ -389,7 +400,9 @@ export default function Chatbot() {
 
     // Stop recording logic
     const stopRecording = async () => {
+        console.log("stop recording is working")
         setRecordingStatus("inactive");
+        setPermission(false)
         mediaRecorder.current.stop();
         mediaRecorder.current.onstop = async () => {
             const audioBlob = new Blob(audioChunks, { type: mimeType });
@@ -411,7 +424,7 @@ export default function Chatbot() {
                     setAudio(audioUrl);
                     setAudioChunks([]);
                     setUploading(false);
-                    setSttLoading(true);
+                    setLoading(true);
                     // setText("Transcribing..");
 
                     const response2 = await fetch("/assistantRoutes/stt", {
@@ -424,10 +437,13 @@ export default function Chatbot() {
 
                     if (response2.status === 200) {
                         const data = await response2.json();
-                        setSelectedQuestion(data[0]);
+                        console.log("data is", data);
+                        console.log("data 1 is", data[0])
+                        setInputValue(data[0]);
+                        setAttemptNumber(attemptNumber + 1);
+                        setLoading(false)
 
                     } else {
-                        console.log("An error occurred while calling /stt");
                     }
                 } else if (response.status === 401) {
                     // handleFlashMessage("User Session not found. Please login again.", false);
@@ -453,14 +469,59 @@ export default function Chatbot() {
         }
     }
 
+    // STT Component
+    const STTComponent = ({ sttItem }) => (
+        <div style={{ backgroundColor: '#C3EDC0', padding: '10px', borderRadius: '10px', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+            {sttItem}
+        </div>
+    );
 
+    // Feedback Component
+    const FeedbackComponent = ({ feedbackItem }) => (
+        <div style={{ backgroundColor: 'lightgrey', padding: '10px', borderRadius: '10px', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+            {feedbackItem}
+        </div>
+    );
 
     var divlist = [];
+    var aiAnswers = answer[quesNumber-1];
 
     const chatBot = () => {
         // Only execute if showChatBot is true
         if (!showChatBot) return null;
-        console.log("selected question is ", selectedQuestion)
+        userInfo &&
+            divlist.push(<div key={userInfo} style={{
+                backgroundColor: '#D1D1D1',
+                color: 'black',
+                padding: '10px',
+                borderRadius: '15px',
+                minWidth: '10%',
+                maxWidth: '60%',
+                marginBottom: '10px',
+                wordWrap: 'break-word',
+            }} >{userInfo} </div>);
+
+        if (aiAnswers) {
+            console.log("ai answers are",aiAnswers)
+            // Push the div into divlist only if there is an answer
+            divlist.push(
+                <div
+                    key={aiAnswers}
+                    style={{
+                        backgroundColor: '#D1D1D1',
+                        color: 'black',
+                        padding: '10px',
+                        borderRadius: '15px',
+                        minWidth: '10%',
+                        maxWidth: '60%',
+                        marginBottom: '10px',
+                        wordWrap: 'break-word',
+                    }}
+                >
+                    {aiAnswers}
+                </div>
+            );
+        }
         selectedQuestion && divlist.push(<div key={selectedQuestion} style={{
             backgroundColor: 'black',
             color: 'white',
@@ -474,8 +535,21 @@ export default function Chatbot() {
             wordWrap: 'break-word',
         }}>{selectedQuestion} </div>);
 
-        selectedQuestion || notfound.map((e, i) => {
-            divlist.push(<div key={i} style={{
+        // selectedQuestion || notfound.map((e, i) => {
+        //     divlist.push(<div key={i} style={{
+        //         backgroundColor: '#D1D1D1',
+        //         color: 'black',
+        //         padding: '10px',
+        //         borderRadius: '15px',
+        //         minWidth: '10%',
+        //         maxWidth: '60%',
+        //         marginBottom: '10px',
+        //         wordWrap: 'break-word',
+        //     }} >{e} </div>);
+        // });
+
+        feedback &&
+            divlist.push(<div key={feedback} style={{
                 backgroundColor: '#D1D1D1',
                 color: 'black',
                 padding: '10px',
@@ -484,22 +558,8 @@ export default function Chatbot() {
                 maxWidth: '60%',
                 marginBottom: '10px',
                 wordWrap: 'break-word',
-            }} >{e} </div>);
-        });
-
-        answer[quesNumber - 1] &&
-            console.log("answer is", answer[quesNumber - 1])
-        divlist.push(<div key={answer[quesNumber - 1]} style={{
-            backgroundColor: '#D1D1D1',
-            color: 'black',
-            padding: '10px',
-            borderRadius: '15px',
-            minWidth: '10%',
-            maxWidth: '60%',
-            marginBottom: '10px',
-            wordWrap: 'break-word',
-        }} >{answer[quesNumber - 1]} </div>);
-
+            }} >{feedback} </div>);
+        
         questions.map((e, i) => {
 
             divlist.push(<div key={i} style={{
@@ -550,7 +610,7 @@ export default function Chatbot() {
             >
 
                 <div style={{
-                    background: '#8fa398',
+                    background: '#231709',
                     padding: '10px',
                     width: '100%',
                     display: 'flex',
@@ -652,10 +712,15 @@ export default function Chatbot() {
                     {/* Loading animation */}
                     {aiQues !== null && botLoading && (
                         <div style={{ alignSelf: 'flex-start' }}>
-                            <DotWave size={30} color="#8fa398" /> {/* Decreased loading animation size */}
+                            <DotWave size={30} color="#231709" /> {/* Decreased loading animation size */}
                         </div>
                     )}
-
+                  {aiQues !== null && loading && (
+                        <div style={{ alignSelf: 'flex-end' }}>
+                            <DotWave size={30} color="#231709" /> {/* Decreased loading animation size */}
+                        </div>
+                    )}
+            
                     {/* Your main content goes here */}
                 </div>
 
